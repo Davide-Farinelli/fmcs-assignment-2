@@ -3,56 +3,19 @@ import sys
 from pynusmv_lower_interface.nusmv.parser import parser 
 from collections import deque
 
-specTypes = {
-    'LTLSPEC': parser.TOK_LTLSPEC,
-    'CONTEXT': parser.CONTEXT,
-    'IMPLIES': parser.IMPLIES,
-    'IFF': parser.IFF,
-    'OR': parser.OR,
-    'XOR': parser.XOR,
-    'XNOR': parser.XNOR,
-    'AND': parser.AND,
-    'NOT': parser.NOT,
-    'ATOM': parser.ATOM,
-    'NUMBER': parser.NUMBER,
-    'DOT': parser.DOT,
+specTypes = {'LTLSPEC': parser.TOK_LTLSPEC, 'CONTEXT': parser.CONTEXT,
+    'IMPLIES': parser.IMPLIES, 'IFF': parser.IFF, 'OR': parser.OR, 'XOR': parser.XOR, 'XNOR': parser.XNOR,
+    'AND': parser.AND, 'NOT': parser.NOT, 'ATOM': parser.ATOM, 'NUMBER': parser.NUMBER, 'DOT': parser.DOT,
 
-    'NEXT': parser.OP_NEXT,
-    'OP_GLOBAL': parser.OP_GLOBAL,
-    'OP_FUTURE': parser.OP_FUTURE,
-    
+    'NEXT': parser.OP_NEXT, 'OP_GLOBAL': parser.OP_GLOBAL, 'OP_FUTURE': parser.OP_FUTURE,
     'UNTIL': parser.UNTIL,
-    
-    'EQUAL': parser.EQUAL,
-    'NOTEQUAL': parser.NOTEQUAL,
-    'LT': parser.LT,
-    'GT': parser.GT,
-    
-    'LE': parser.LE,
-    'GE': parser.GE,
-    'TRUE': parser.TRUEEXP,
-    'FALSE': parser.FALSEEXP
+    'EQUAL': parser.EQUAL, 'NOTEQUAL': parser.NOTEQUAL, 'LT': parser.LT, 'GT': parser.GT,
+    'LE': parser.LE, 'GE': parser.GE, 'TRUE': parser.TRUEEXP, 'FALSE': parser.FALSEEXP
 }
 
-basicTypes = {parser.ATOM,
-              parser.NUMBER,
-              parser.TRUEEXP,
-              parser.FALSEEXP,
-              parser.DOT,
-              
-              parser.EQUAL,
-              parser.NOTEQUAL,
-              parser.LT,
-              parser.GT,
-              parser.LE,
-              parser.GE}
-
-booleanOp = {parser.AND,
-             parser.OR,
-             parser.XOR,
-             parser.XNOR,
-             parser.IMPLIES,
-             parser.IFF}
+basicTypes = {parser.ATOM, parser.NUMBER, parser.TRUEEXP, parser.FALSEEXP, parser.DOT,
+              parser.EQUAL, parser.NOTEQUAL, parser.LT, parser.GT, parser.LE, parser.GE}
+booleanOp = {parser.AND, parser.OR, parser.XOR, parser.XNOR, parser.IMPLIES, parser.IFF}
 
 def spec_to_bdd(model, spec):
     """
@@ -62,6 +25,29 @@ def spec_to_bdd(model, spec):
     """
     bddspec = pynusmv.mc.eval_simple_expression(model, str(spec))
     return bddspec
+
+def research(fsm, bddspec):
+    #seguo algoritmo
+    reach = {}
+    new = fsm.init
+
+    while fsm.count_states(new) > 0:
+        #notResp = new - bddspec
+        #if fsm.count_states(notResp) > 0: #se qualcosa non rispetta
+        #    return fsm.pick_one_state_random(notResp), sequence
+        #sequence.append(new)
+        new = fsm.post(new) - reach
+        reach = reach + new
+    recur = reach & bddspec
+    while fsm.count_states(recur) > 0:
+        reach = {}
+        new = fsm.pre(new)
+        while fsm.count_states(new) > 0:
+            reach = reach + new
+            if recur.issubset(reach): return True
+            new = fsm.pre(new) - reach
+        recur = recur & reach
+    return False
     
 def is_boolean_formula(spec):
     """
@@ -96,7 +82,7 @@ def check_GF_formula(spec):
 def parse_react(spec):
     """
     Visit the syntactic tree of the formula `spec` to check if it is a reactive formula,
-    that is wether the formula is of the form
+    that is whether the formula is of the form
     
                     GF f -> GF g
     
@@ -130,16 +116,54 @@ def check_react_spec(spec):
     `spec`, that is, whether all executions of the model satisfies `spec`
     or not. 
     """
-    if parse_react(spec) == None:
-        return None
-    return pynusmv.mc.check_explain_ltl_spec(spec)
+    """
+    fsm = pynusmv.glob.prop_database().master.bddFsm
+    bddspec = spec_to_bdd(fsm, spec)
+    #result = research(fsm, bddspec)
+    """
+      # ricerca per vedere se rispetta
+    # funzione che costruisce l'albero e controllo su res
+    '''
+    if node is not None:
+        path = go_back(fsm, node, reachable)  # returns tuple of nodes
+        str_path = ()
+        for element in path:
+            str_path = str_path + (element.get_str_values(),)
+        return False, str_path
+    else:
+        return True, None
+    '''
+    fsm = pynusmv.glob.prop_database().master.bddFsm
+    print(spec)
+    #bddspec = spec_to_bdd(fsm, spec)
 
-if len(sys.argv) != 2:
-    print("Usage:", sys.argv[0], "filename.smv")
-    sys.exit(1)
+    if parse_react(spec) == None:
+        return False, None
+    else:
+
+        #bddspec = spec_to_bdd(fsm, spec)
+        f, g = parse_react(spec)
+        bddspec_f = spec_to_bdd(fsm, f)
+        bddspec_g = spec_to_bdd(fsm, g)
+
+        print(f)
+        print(g)
+        
+        research(fsm, )
+        #research(fsm, bddspec_f)
+        #return True, reachable
+
+        #return pynusmv.mc.check_explain_ltl_spec(spec)
+
+
+
+#if len(sys.argv) != 2:
+
+#    print("Usage:", sys.argv[0], "filename.smv")
+#    sys.exit(1)
 
 pynusmv.init.init_nusmv()
-filename = sys.argv[1]
+filename = "react_examples/mutex.smv"
 pynusmv.glob.load_from_file(filename)
 pynusmv.glob.compute_model()
 type_ltl = pynusmv.prop.propTypes['LTL']
@@ -150,12 +174,12 @@ for prop in pynusmv.glob.prop_database():
         print("property is not LTLSPEC, skipping")
         continue
     res = check_react_spec(spec)
-    if res == None:
-        print('Property is not a GR(1) formula, skipping')
-    if res[0] == True:
+    #if res == None:
+    #    print('Property is not a GR(1) formula, skipping')
+    if res == True:
         print("Property is respected")
-    elif res[0] == False:
+    elif res == False:
         print("Property is not respected")
-        print("Counterexample:", res[1])
+        #print("Counterexample:", res[1])
 
 pynusmv.init.deinit_nusmv()
